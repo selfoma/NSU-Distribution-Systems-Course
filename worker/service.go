@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 )
 
-func bruteForce(targetHash string, maxLength int, partNumber int, partCount int) []string {
+func bruteForce(targetHash string, maxLength, partNumber, partCount int) []string {
 	alphabet := "abcdefghijklmnopqrstuvwxyz0123456789"
 	var found []string
 
