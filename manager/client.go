@@ -18,7 +18,7 @@ type WorkerTask struct {
 func sendWorkerTask(workerURL string, task WorkerTask) error {
 	data, err := json.Marshal(task)
 	if err != nil {
-		return fmt.Errorf("encode task to json failed: %w", err)
+		return fmt.Errorf("marshal task to json failed: %w", err)
 	}
 
 	resp, err := http.Post(workerURL, "application/json", bytes.NewBuffer(data))

@@ -4,11 +4,10 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/google/uuid"
-	"log"
 	"net/http"
-	"sync"
 )
+
+var crackService = NewCrackService()
 
 type ClientCrackRequest struct {
 	Hash      string `json:"hash"`
@@ -31,25 +30,9 @@ func handleCrackRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	requestId := uuid.New().String()
-	taskResults.tasks[requestId] = &TaskStatus{
-		Words:    nil,
-		Parts:    1,
-		Received: 0,
-		Status:   StatusInProgress,
-	}
-
-	workerURL := "http://localhost:8081/internal/api/worker/hash/crack/task"
-	task := WorkerTask{
-		RequestId:  requestId,
-		Hash:       req.Hash,
-		MaxLength:  req.MaxLength,
-		PartNumber: 0,
-		PartCount:  1,
-	}
-	err := sendWorkerTask(workerURL, task)
+	requestId, err := crackService.StartCrackHash(req.Hash, req.MaxLength, 1)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Send task to worker failed: %v", err), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -68,24 +51,6 @@ type WorkerResponse struct {
 	PartNumber int      `xml:"partNumber"`
 }
 
-const (
-	StatusInProgress = "IN_PROGRESS"
-	StatusReady      = "READY"
-	StatusError      = "ERROR"
-)
-
-type TaskStatus struct {
-	Words    []string `json:"words"`
-	Parts    int      `json:"parts"`
-	Received int      `json:"received"`
-	Status   string   `json:"status"`
-}
-
-var taskResults = struct {
-	sync.Mutex
-	tasks map[string]*TaskStatus
-}{tasks: make(map[string]*TaskStatus)}
-
 func handleWorkerResponse(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPatch {
 		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
@@ -98,21 +63,10 @@ func handleWorkerResponse(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	taskResults.Mutex.Lock()
-	defer taskResults.Mutex.Unlock()
-
-	task, e := taskResults.tasks[resp.RequestId]
-	if !e {
-		http.Error(w, fmt.Sprintf("task [%s] not found", resp.RequestId), http.StatusNotFound)
+	e := crackService.ProcessWorkerResponse(resp.RequestId, resp.Words)
+	if e != nil {
+		http.Error(w, e.Error(), http.StatusNotFound)
 		return
-	}
-
-	task.Words = append(task.Words, resp.Words...)
-	task.Received++
-
-	if task.Received == task.Parts {
-		task.Status = StatusReady
-		log.Printf("Task [%s] completed, found words: %v", resp.RequestId, resp.Words)
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -135,10 +89,9 @@ func handleStatusRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, e := taskResults.tasks[requestId]
-	if !e {
-		http.Error(w, fmt.Sprintf("task [%s] not found", requestId), http.StatusNotFound)
-		return
+	task, err := crackService.GetTask(requestId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
 	var data []string

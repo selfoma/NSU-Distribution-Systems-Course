@@ -29,7 +29,17 @@ func handleWorkerTask(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("Received task: ", req)
 
 	foundWords := bruteForce(req.Hash, req.MaxLength, req.PartNumber, req.PartCount)
-	fmt.Println("Found words:", foundWords)
+
+	managerUrl := "http://localhost:8080/internal/api/manager/hash/crack/request"
+	resp := WorkerResponse{
+		RequestId:  req.RequestId,
+		Words:      foundWords,
+		PartNumber: req.PartNumber,
+	}
+	err := sendResultToManager(managerUrl, resp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 
 	w.WriteHeader(http.StatusOK)
 }
