@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"encoding/xml"
-	"fmt"
+	"log"
 	"net/http"
 )
 
@@ -30,7 +30,7 @@ func handleCrackRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	requestId, err := crackService.StartCrackHash(req.Hash, req.MaxLength, 1)
+	requestId, err := crackService.StartCrackHash(req.Hash, req.MaxLength)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -40,7 +40,7 @@ func handleCrackRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Encode task to worker failed: %v", err), http.StatusInternalServerError)
+		log.Printf("Failed to encode response: %v", err)
 		return
 	}
 }
@@ -104,5 +104,8 @@ func handleStatusRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	err = json.NewEncoder(w).Encode(resp)
+	if err != nil {
+		log.Printf("Failed to encode response: %v", err)
+	}
 }

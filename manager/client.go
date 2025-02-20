@@ -7,14 +7,6 @@ import (
 	"net/http"
 )
 
-type WorkerTask struct {
-	RequestId  string `json:"requestId"`
-	Hash       string `json:"hash"`
-	MaxLength  int    `json:"maxLength"`
-	PartNumber int    `json:"partNumber"`
-	PartCount  int    `json:"partCount"`
-}
-
 func sendWorkerTask(workerURL string, task WorkerTask) error {
 	data, err := json.Marshal(task)
 	if err != nil {
