@@ -61,7 +61,7 @@ func (s *TaskStorage) UpdateTask(requestId string, workerFoundWords []string) er
 
 	if task.Received == task.Parts {
 		task.Status = StatusReady
-		log.Printf("Task [%s] completed, found words: %v", requestId, workerFoundWords)
+		log.Printf("Task [%s] completed, found words: %v", requestId, task.Words)
 		time.AfterFunc(TimeOut, func() {
 			s.mu.Lock()
 			defer s.mu.Unlock()

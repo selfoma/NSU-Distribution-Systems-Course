@@ -6,6 +6,8 @@ import (
 	"net/http"
 )
 
+var config, _ = LoadConfig("config.json")
+
 type WorkerTask struct {
 	RequestId   string `json:"requestId"`
 	Hash        string `json:"hash"`
@@ -33,7 +35,6 @@ func handleWorkerTask(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Printf("[ID=%s][W=%d] Found words: %s\n", req.RequestId, req.PartNumber, foundWords)
 
-	var config, _ = LoadConfig("config.json")
 	managerUrl := config.ManagerUrl
 	resp := WorkerResponse{
 		RequestId:  req.RequestId,

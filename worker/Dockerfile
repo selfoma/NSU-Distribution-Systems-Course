@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o worker .
 FROM alpine:latest
 WORKDIR /root/
 
-COPY --from=build /app/worker .
+COPY --from=build /app/* .
 RUN chmod +x /root/worker
 
 CMD ["./worker"]
