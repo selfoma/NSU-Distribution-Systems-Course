@@ -7,11 +7,12 @@ import (
 )
 
 type WorkerTask struct {
-	RequestId  string `json:"requestId"`
-	Hash       string `json:"hash"`
-	MaxLength  int    `json:"maxLength"`
-	PartNumber int    `json:"partNumber"`
-	PartCount  int    `json:"partCount"`
+	RequestId   string `json:"requestId"`
+	Hash        string `json:"hash"`
+	MaxLength   int    `json:"maxLength"`
+	WorkerCount int    `json:"workerCount"`
+	PartNumber  int    `json:"partNumber"`
+	PartCount   int    `json:"partCount"`
 }
 
 func handleWorkerTask(w http.ResponseWriter, r *http.Request) {
@@ -28,9 +29,12 @@ func handleWorkerTask(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Received task: ", req)
 
-	foundWords := bruteForce(req.Hash, req.MaxLength, req.PartNumber, req.PartCount)
+	foundWords := bruteForce(req.Hash, req.MaxLength, req.WorkerCount, req.PartNumber, req.PartCount)
 
-	managerUrl := "http://localhost:8080/internal/api/manager/hash/crack/request"
+	fmt.Printf("[ID=%s][W=%d] Found words: %s\n", req.RequestId, req.PartNumber, foundWords)
+
+	var config, _ = LoadConfig("config.json")
+	managerUrl := config.ManagerUrl
 	resp := WorkerResponse{
 		RequestId:  req.RequestId,
 		Words:      foundWords,
@@ -39,6 +43,7 @@ func handleWorkerTask(w http.ResponseWriter, r *http.Request) {
 	err := sendResultToManager(managerUrl, resp)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)
