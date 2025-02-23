@@ -3,9 +3,14 @@ package main
 import (
 	"fmt"
 	"github.com/google/uuid"
+	"log"
+	"time"
 )
 
-var alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+const (
+	alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+	timeOut  = 3 * time.Minute
+)
 
 type WorkerTask struct {
 	RequestId   string `json:"requestId"`
@@ -55,14 +60,35 @@ func (cs *CrackService) StartCrackHash(hash string, maxLength int) (string, erro
 		}
 	}
 
+	go cs.monitorTaskTimeOut(requestId)
+
 	return requestId, nil
+}
+
+func (cs *CrackService) monitorTaskTimeOut(requestId string) {
+	timer := time.NewTimer(timeOut)
+	defer timer.Stop()
+
+	<-timer.C
+
+	s, err := cs.taskStorage.GetTaskStatusById(requestId)
+	if err != nil {
+		log.Printf("get task status failed: %v", err)
+	}
+
+	if s != StatusReady {
+		err = cs.taskStorage.UpdateTaskStatus(requestId, StatusError)
+		if err != nil {
+			log.Printf("update task status failed: %v", err)
+		}
+	}
 }
 
 func (cs *CrackService) ProcessWorkerResponse(requestId string, words []string) error {
 	return cs.taskStorage.UpdateTask(requestId, words)
 }
 
-func (cs *CrackService) GetTask(requestId string) (*TaskStatus, error) {
+func (cs *CrackService) GetTask(requestId string) (*Task, error) {
 	return cs.taskStorage.GetTask(requestId)
 }
 

@@ -4,17 +4,15 @@ import (
 	"fmt"
 	"log"
 	"sync"
-	"time"
 )
 
 const (
 	StatusInProgress = "IN_PROGRESS"
 	StatusReady      = "READY"
 	StatusError      = "ERROR"
-	TimeOut          = 30 * time.Second
 )
 
-type TaskStatus struct {
+type Task struct {
 	Words    []string `json:"words"`
 	Parts    int      `json:"parts"`
 	Received int      `json:"received"`
@@ -22,21 +20,21 @@ type TaskStatus struct {
 }
 
 type TaskStorage struct {
-	mu    sync.Mutex
-	tasks map[string]*TaskStatus
+	mu    sync.RWMutex
+	tasks map[string]*Task
 }
 
 func NewTaskStorage() *TaskStorage {
 	return &TaskStorage{
-		tasks: make(map[string]*TaskStatus),
+		tasks: make(map[string]*Task),
 	}
 }
 
-func (s *TaskStorage) CreateTask(requestId string, parts int) *TaskStatus {
+func (s *TaskStorage) CreateTask(requestId string, parts int) *Task {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	task := &TaskStatus{
+	task := &Task{
 		Words:    nil,
 		Parts:    parts,
 		Received: 0,
@@ -61,18 +59,40 @@ func (s *TaskStorage) UpdateTask(requestId string, workerFoundWords []string) er
 
 	if task.Received == task.Parts {
 		task.Status = StatusReady
-		log.Printf("Task [%s] completed, found words: %v", requestId, task.Words)
-		time.AfterFunc(TimeOut, func() {
-			s.mu.Lock()
-			defer s.mu.Unlock()
-			task.Status = StatusError
-		})
+		log.Printf("Task [%s] completed, found words: %v", requestId, workerFoundWords)
 	}
 
 	return nil
 }
 
-func (s *TaskStorage) GetTask(requestId string) (*TaskStatus, error) {
+func (s *TaskStorage) GetTaskStatusById(requestId string) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if task, ok := s.tasks[requestId]; ok {
+		return task.Status, nil
+	}
+	return "", fmt.Errorf("task %s not found", requestId)
+}
+
+func (s *TaskStorage) UpdateTaskStatus(requestId, status string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	task, ok := s.tasks[requestId]
+	if !ok {
+		return fmt.Errorf("task %s not found", requestId)
+	}
+
+	task.Status = status
+
+	return nil
+}
+
+func (s *TaskStorage) GetTask(requestId string) (*Task, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	task, ok := s.tasks[requestId]
 	if !ok {
 		return nil, fmt.Errorf("task %s not found", requestId)

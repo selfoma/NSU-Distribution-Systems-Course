@@ -5,7 +5,9 @@ import (
 	"encoding/hex"
 )
 
-var alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+const (
+	alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+)
 
 func bruteForce(targetHash string, maxLength, workerCount, partNumber, partCount int) []string {
 	var found []string
