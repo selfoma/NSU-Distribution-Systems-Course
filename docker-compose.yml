@@ -19,6 +19,15 @@ services:
             - crackhash-net
         volumes:
             - ./worker/config.json:/root/config.json
+    mongo-init:
+        image: mongo:latest
+        depends_on:
+            - mongo-primary
+        entrypoint: ["mongosh", "--host", "mongo-primary", "--file", "./scripts/init-replica.js"]
+        volumes:
+            - ./scripts:/scripts
+        networks:
+            - crackhash-net
     mongo-primary:
         image: mongo:latest
         restart: always
