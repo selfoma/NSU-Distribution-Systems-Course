@@ -2,24 +2,26 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 )
+
+var config *Config
 
 type Config struct {
 	ManagerUrl string `json:"managerUrl"`
 }
 
-func LoadConfig(filename string) (*Config, error) {
+func loadConfig(filename string) error {
 	file, err := os.Open(filename)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("error opening config file: %s", err)
 	}
 	defer file.Close()
 
-	var cfg Config
-	if err = json.NewDecoder(file).Decode(&cfg); err != nil {
-		return nil, err
+	if err = json.NewDecoder(file).Decode(&config); err != nil {
+		return fmt.Errorf("error parsing config file: %s", err)
 	}
 
-	return &cfg, nil
+	return nil
 }

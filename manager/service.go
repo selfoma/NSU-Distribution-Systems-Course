@@ -23,17 +23,11 @@ type WorkerTask struct {
 
 type CrackService struct {
 	taskStorage *TaskStorage
-	config      *Config
 }
 
 func NewCrackService() *CrackService {
-	config, err := LoadConfig("config.json")
-	if err != nil {
-		panic(err)
-	}
 	return &CrackService{
 		taskStorage: NewTaskStorage(),
-		config:      config,
 	}
 }
 
@@ -43,15 +37,15 @@ func (cs *CrackService) StartCrackHash(hash string, maxLength int) (string, erro
 	cs.taskStorage.CreateTask(requestId, 1)
 
 	words := countWordsInAlphabet(alphabet, maxLength)
-	for i := 0; i < cs.config.WorkerCount; i++ {
-		workerURL := cs.config.WorkerUrls[i]
+	for i := 0; i < config.WorkerCount; i++ {
+		workerURL := config.WorkerUrls[i]
 		task := WorkerTask{
 			RequestId:   requestId,
 			Hash:        hash,
 			MaxLength:   maxLength,
-			WorkerCount: cs.config.WorkerCount,
+			WorkerCount: config.WorkerCount,
 			PartNumber:  i,
-			PartCount:   countPartSize(words, cs.config.WorkerCount, i),
+			PartCount:   countPartSize(words, config.WorkerCount, i),
 		}
 
 		err := sendWorkerTask(workerURL, task)

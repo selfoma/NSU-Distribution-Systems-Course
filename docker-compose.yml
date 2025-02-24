@@ -3,6 +3,7 @@ version: '3.8'
 services:
     manager:
         build: ./manager
+        restart: always
         ports:
             - "8080:8080"
         networks:
@@ -13,10 +14,42 @@ services:
             - worker0
     worker0:
         build: ./worker
+        restart: always
         networks:
             - crackhash-net
         volumes:
             - ./worker/config.json:/root/config.json
+    mongo-primary:
+        image: mongo:latest
+        restart: always
+        command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+        ports:
+            - "21017:21017"
+        networks:
+            - crackhash-net
+    mongo-secondary-1:
+        image: mongo:latest
+        restart: always
+        command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+        networks:
+            - crackhash-net
+    mongo-secondary-2:
+        image: mongo:latest
+        restart: always
+        command: [ "mongod", "--replSet", "rs0", "--bind_ip_all" ]
+        networks:
+            - crackhash-net
+    rabbitmq:
+        image: rabbitmq:3-management
+        restart: always
+        environment:
+            RABBITMQ_DEFAULT_USER: user
+            RABBITMQ_DEFAULT_PASSWORD: password
+        ports:
+            - "5672:5672"
+            - "15672:15672"
+        networks:
+            - crackhash-net
 
 networks:
     crackhash-net:

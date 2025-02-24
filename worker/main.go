@@ -7,6 +7,11 @@ import (
 )
 
 func main() {
+	err := loadConfig("config.json")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	http.HandleFunc("/internal/api/worker/hash/crack/task", handleWorkerTask)
 
 	port := "8081"

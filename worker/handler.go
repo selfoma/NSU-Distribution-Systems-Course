@@ -6,8 +6,6 @@ import (
 	"net/http"
 )
 
-var config, _ = LoadConfig("config.json")
-
 type WorkerTask struct {
 	RequestId   string `json:"requestId"`
 	Hash        string `json:"hash"`
