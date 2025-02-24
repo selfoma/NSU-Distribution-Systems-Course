@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+    manager:
+        build: ./manager
+        ports:
+            - "8080:8080"
+        networks:
+            - crackhash-net
+        volumes:
+            - ./manager/config.json:/root/config.json
+        depends_on:
+            - worker0
+    worker0:
+        build: ./worker
+        networks:
+            - crackhash-net
+        volumes:
+            - ./worker/config.json:/root/config.json
+
+networks:
+    crackhash-net:
+        driver: bridge
+        
