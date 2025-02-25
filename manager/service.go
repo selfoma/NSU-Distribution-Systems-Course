@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"github.com/google/uuid"
 	"log"
 	"time"
@@ -11,15 +10,6 @@ const (
 	alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
 	timeOut  = 3 * time.Minute
 )
-
-type WorkerTask struct {
-	RequestId   string `json:"requestId"`
-	Hash        string `json:"hash"`
-	MaxLength   int    `json:"maxLength"`
-	WorkerCount int    `json:"workerCount"`
-	PartNumber  int    `json:"partNumber"`
-	PartCount   int    `json:"partCount"`
-}
 
 type CrackService struct {
 	taskStorage *TaskStorage
@@ -38,7 +28,6 @@ func (cs *CrackService) StartCrackHash(hash string, maxLength int) (string, erro
 
 	words := countWordsInAlphabet(alphabet, maxLength)
 	for i := 0; i < config.WorkerCount; i++ {
-		workerURL := config.WorkerUrls[i]
 		task := WorkerTask{
 			RequestId:   requestId,
 			Hash:        hash,
@@ -46,11 +35,17 @@ func (cs *CrackService) StartCrackHash(hash string, maxLength int) (string, erro
 			WorkerCount: config.WorkerCount,
 			PartNumber:  i,
 			PartCount:   countPartSize(words, config.WorkerCount, i),
+			Status:      "pending",
 		}
 
-		err := sendWorkerTask(workerURL, task)
+		err := saveWorkerTask(task)
 		if err != nil {
-			return "", fmt.Errorf("send task to worker failed: %v", err)
+			log.Fatal(err)
+		}
+
+		err = sendRabbitMq(task)
+		if err != nil {
+			log.Printf("Error sending rabbitmq task: %v", err)
 		}
 	}
 
@@ -82,7 +77,7 @@ func (cs *CrackService) ProcessWorkerResponse(requestId string, words []string) 
 	return cs.taskStorage.UpdateTask(requestId, words)
 }
 
-func (cs *CrackService) GetTask(requestId string) (*Task, error) {
+func (cs *CrackService) GetTask(requestId string) (*TaskResult, error) {
 	return cs.taskStorage.GetTask(requestId)
 }
 

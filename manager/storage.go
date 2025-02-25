@@ -12,7 +12,7 @@ const (
 	StatusError      = "ERROR"
 )
 
-type Task struct {
+type TaskResult struct {
 	Words    []string `json:"words"`
 	Parts    int      `json:"parts"`
 	Received int      `json:"received"`
@@ -21,20 +21,20 @@ type Task struct {
 
 type TaskStorage struct {
 	mu    sync.RWMutex
-	tasks map[string]*Task
+	tasks map[string]*TaskResult
 }
 
 func NewTaskStorage() *TaskStorage {
 	return &TaskStorage{
-		tasks: make(map[string]*Task),
+		tasks: make(map[string]*TaskResult),
 	}
 }
 
-func (s *TaskStorage) CreateTask(requestId string, parts int) *Task {
+func (s *TaskStorage) CreateTask(requestId string, parts int) *TaskResult {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	task := &Task{
+	task := &TaskResult{
 		Words:    nil,
 		Parts:    parts,
 		Received: 0,
@@ -59,7 +59,7 @@ func (s *TaskStorage) UpdateTask(requestId string, workerFoundWords []string) er
 
 	if task.Received == task.Parts {
 		task.Status = StatusReady
-		log.Printf("Task [%s] completed, found words: %v", requestId, workerFoundWords)
+		log.Printf("TaskResult [%s] completed, found words: %v", requestId, workerFoundWords)
 	}
 
 	return nil
@@ -89,7 +89,7 @@ func (s *TaskStorage) UpdateTaskStatus(requestId, status string) error {
 	return nil
 }
 
-func (s *TaskStorage) GetTask(requestId string) (*Task, error) {
+func (s *TaskStorage) GetTask(requestId string) (*TaskResult, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 

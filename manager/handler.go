@@ -8,7 +8,6 @@ import (
 )
 
 var crackService = NewCrackService()
-var clientRequestCache = make(map[ClientCrackRequest]string)
 
 type ClientCrackRequest struct {
 	Hash      string `json:"hash"`
@@ -32,20 +31,15 @@ func handleCrackRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := ClientCrackResponse{}
-	if id, e := clientRequestCache[req]; e {
-		resp.RequestId = id
-	} else {
-		requestId, err := crackService.StartCrackHash(req.Hash, req.MaxLength)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		clientRequestCache[req] = requestId
-		resp.RequestId = requestId
+	requestId, err := crackService.StartCrackHash(req.Hash, req.MaxLength)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	resp.RequestId = requestId
 
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(resp)
+	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {
 		log.Printf("Failed to encode response: %v", err)
 		return

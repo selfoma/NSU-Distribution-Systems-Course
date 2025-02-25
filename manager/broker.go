@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/rabbitmq/amqp091-go"
 )
@@ -25,6 +26,28 @@ func connectRabbitMq() error {
 	return nil
 }
 
-func sendRabbitMq(task WorkerTask) {
+func sendRabbitMq(task WorkerTask) error {
+	queueName := "worker_tasks"
 
+	_, err := rabbitChannel.QueueDeclare(queueName, true, false, false, false, nil)
+	if err != nil {
+		return err
+	}
+
+	body, _ := json.Marshal(task)
+	err = rabbitChannel.Publish("", queueName, false, false, amqp091.Publishing{
+		ContentType:  "application/json",
+		Body:         body,
+		DeliveryMode: amqp091.Persistent,
+	})
+	if err != nil {
+		return err
+	}
+
+	err = setTaskStatusSent(task)
+	if err != nil {
+		return fmt.Errorf("send task to rabbitmq: %v", err)
+	}
+
+	return nil
 }

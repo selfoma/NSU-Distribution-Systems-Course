@@ -22,6 +22,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	go retryPendingTask()
+
 	http.HandleFunc("/api/hash/crack", handleCrackRequest)
 	http.HandleFunc("/api/hash/status", handleStatusRequest)
 	http.HandleFunc("/internal/api/manager/hash/crack/request", handleWorkerResponse)
