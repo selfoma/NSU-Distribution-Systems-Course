@@ -1,8 +1,9 @@
-package main
+package database
 
 import (
 	"context"
 	"fmt"
+	"github.com/selfoma/crackhash/manager/broker"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -28,7 +29,7 @@ type WorkerTask struct {
 	Status      string `bson:"status"        json:"status"`
 }
 
-func connectMongo() error {
+func ConnectMongo() error {
 	clientOptions := options.Client().
 		ApplyURI("mongodb://mongo-primary:21017,mongo-secondary-1:21017,mongo-secondary-2:21017/?replicaSet=rs0").
 		SetWriteConcern(writeconcern.Majority()).
@@ -50,7 +51,7 @@ func connectMongo() error {
 	return nil
 }
 
-func saveWorkerTask(task WorkerTask) error {
+func SaveWorkerTask(task WorkerTask) error {
 	collection := db.Collection("workertasks")
 
 	for i := 0; i < maxRetries; i++ {
@@ -64,7 +65,7 @@ func saveWorkerTask(task WorkerTask) error {
 	return fmt.Errorf("task save failed: max retries exceeded")
 }
 
-func setTaskStatusSent(task WorkerTask) error {
+func SetTaskStatusSent(task WorkerTask) error {
 	collection := db.Collection("workertasks")
 
 	for i := 0; i < maxRetries; i++ {
@@ -81,7 +82,7 @@ func setTaskStatusSent(task WorkerTask) error {
 	return fmt.Errorf("update task status failed: max retries exceeded")
 }
 
-func retryPendingTask() {
+func RetryPendingTask() {
 	for {
 		time.Sleep(10 * time.Second)
 
@@ -94,10 +95,7 @@ func retryPendingTask() {
 		for cursor.Next(context.TODO()) {
 			var task WorkerTask
 			if err = cursor.Decode(&task); err == nil {
-				err = sendRabbitMq(task)
-				if err != nil {
-					log.Printf("rabbitMq task sending failed: %v", err)
-				}
+				broker.PublishTask(task)
 			}
 		}
 	}

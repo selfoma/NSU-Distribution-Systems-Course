@@ -1,0 +1,9 @@
+{
+  "workerCount": 2,
+  "workerUrls": [
+    "http://worker0:8081/internal/api/worker/hash/crack/task",
+    "http://worker1:8081/internal/api/worker/hash/crack/task"
+  ],
+  "responseQueueName": "worker_responses",
+  "taskQueueName":     "worker_tasks"
+}

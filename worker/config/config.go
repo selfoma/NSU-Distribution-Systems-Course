@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"encoding/json"
@@ -6,25 +6,23 @@ import (
 	"os"
 )
 
-var config *Config
+var Cfg *Config
 
 type Config struct {
-	WorkerCount int      `json:"workerCount"`
-	WorkerUrls  []string `json:"workerUrls"`
+	ManagerUrl        string `json:"managerUrl"`
+	ResponseQueueName string `json:"responseQueueName"`
 }
 
-func loadConfig(filename string) error {
+func LoadConfig(filename string) error {
 	file, err := os.Open(filename)
 	if err != nil {
 		return fmt.Errorf("error opening config file: %s", err)
 	}
 	defer file.Close()
 
-	if err = json.NewDecoder(file).Decode(&config); err != nil {
+	if err = json.NewDecoder(file).Decode(&Cfg); err != nil {
 		return fmt.Errorf("error parsing config file: %s", err)
 	}
-
-	fmt.Println("CONFIG: SUCCEEDED")
 
 	return nil
 }

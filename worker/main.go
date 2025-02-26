@@ -2,17 +2,24 @@ package main
 
 import (
 	"fmt"
+	"github.com/selfoma/crackhash/worker/broker"
+	"github.com/selfoma/crackhash/worker/config"
 	"log"
 	"net/http"
 )
 
 func main() {
-	err := loadConfig("config.json")
+	err := config.LoadConfig("config/config.json")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	http.HandleFunc("/internal/api/worker/hash/crack/task", handleWorkerTask)
+	err = broker.ConnectRabbit()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go broker.ConsumeTask()
 
 	port := "8081"
 	fmt.Printf("Worker running on port %s\n", port)

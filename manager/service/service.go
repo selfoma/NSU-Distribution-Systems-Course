@@ -1,7 +1,10 @@
-package main
+package service
 
 import (
 	"github.com/google/uuid"
+	"github.com/selfoma/crackhash/manager/broker"
+	"github.com/selfoma/crackhash/manager/config"
+	"github.com/selfoma/crackhash/manager/database"
 	"log"
 	"time"
 )
@@ -11,42 +14,41 @@ const (
 	timeOut  = 3 * time.Minute
 )
 
-type CrackService struct {
+var CrackService = newCrackService()
+
+type crackService struct {
 	taskStorage *TaskStorage
 }
 
-func NewCrackService() *CrackService {
-	return &CrackService{
+func newCrackService() *crackService {
+	return &crackService{
 		taskStorage: NewTaskStorage(),
 	}
 }
 
-func (cs *CrackService) StartCrackHash(hash string, maxLength int) (string, error) {
+func (cs *crackService) StartCrackHash(hash string, maxLength int) (string, error) {
 	requestId := uuid.New().String()
 
 	cs.taskStorage.CreateTask(requestId, 1)
 
 	words := countWordsInAlphabet(alphabet, maxLength)
-	for i := 0; i < config.WorkerCount; i++ {
-		task := WorkerTask{
+	for i := 0; i < config.Cfg.WorkerCount; i++ {
+		task := database.WorkerTask{
 			RequestId:   requestId,
 			Hash:        hash,
 			MaxLength:   maxLength,
-			WorkerCount: config.WorkerCount,
+			WorkerCount: config.Cfg.WorkerCount,
 			PartNumber:  i,
-			PartCount:   countPartSize(words, config.WorkerCount, i),
+			PartCount:   countPartSize(words, config.Cfg.WorkerCount, i),
 			Status:      "pending",
 		}
 
-		err := saveWorkerTask(task)
+		err := database.SaveWorkerTask(task)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		err = sendRabbitMq(task)
-		if err != nil {
-			log.Printf("Error sending rabbitmq task: %v", err)
-		}
+		broker.PublishTask(task)
 	}
 
 	go cs.monitorTaskTimeOut(requestId)
@@ -54,7 +56,7 @@ func (cs *CrackService) StartCrackHash(hash string, maxLength int) (string, erro
 	return requestId, nil
 }
 
-func (cs *CrackService) monitorTaskTimeOut(requestId string) {
+func (cs *crackService) monitorTaskTimeOut(requestId string) {
 	timer := time.NewTimer(timeOut)
 	defer timer.Stop()
 
@@ -73,11 +75,11 @@ func (cs *CrackService) monitorTaskTimeOut(requestId string) {
 	}
 }
 
-func (cs *CrackService) ProcessWorkerResponse(requestId string, words []string) error {
+func (cs *crackService) ProcessWorkerResponse(requestId string, words []string) error {
 	return cs.taskStorage.UpdateTask(requestId, words)
 }
 
-func (cs *CrackService) GetTask(requestId string) (*TaskResult, error) {
+func (cs *crackService) GetTask(requestId string) (*TaskResult, error) {
 	return cs.taskStorage.GetTask(requestId)
 }
 

@@ -19,6 +19,13 @@ services:
             - crackhash-net
         volumes:
             - ./worker/config.json:/root/config.json
+    worker1:
+        build: ./worker
+        restart: always
+        networks:
+            - crackhash-net
+        volumes:
+            - ./worker/config.json:/root/config.json
     mongo-init:
         image: mongo:latest
         depends_on:
