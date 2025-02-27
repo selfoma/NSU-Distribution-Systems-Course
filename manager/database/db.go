@@ -3,13 +3,11 @@ package database
 import (
 	"context"
 	"fmt"
-	"github.com/selfoma/crackhash/manager/broker"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
-	"log"
 	"time"
 )
 
@@ -29,33 +27,34 @@ type WorkerTask struct {
 	Status      string `bson:"status"        json:"status"`
 }
 
-func ConnectMongo() error {
+func ConnectMongo() (*mongo.Collection, error) {
 	clientOptions := options.Client().
 		ApplyURI("mongodb://mongo-primary:21017,mongo-secondary-1:21017,mongo-secondary-2:21017/?replicaSet=rs0").
 		SetWriteConcern(writeconcern.Majority()).
 		SetReadConcern(readconcern.Majority())
 	client, err := mongo.Connect(context.TODO(), clientOptions)
 	if err != nil {
-		return fmt.Errorf("error connecting to database: %v", err)
+		return nil, fmt.Errorf("error connecting to database: %v", err)
 	}
 
 	err = client.Ping(context.TODO(), nil)
 	if err != nil {
-		return fmt.Errorf("database connection verification failed: %v", err)
+		return nil, fmt.Errorf("database connection verification failed: %v", err)
 	}
 
 	db = client.Database("crackhash")
 
 	fmt.Println("MONGODB: SUCCEEDED")
 
-	return nil
+	return db.Collection("tasks"), nil
 }
 
-func SaveWorkerTask(task WorkerTask) error {
-	collection := db.Collection("workertasks")
+func SaveWorkerTask(collection *mongo.Collection, task *WorkerTask) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
 
 	for i := 0; i < maxRetries; i++ {
-		_, err := collection.InsertOne(context.TODO(), task)
+		_, err := collection.InsertOne(ctx, task)
 		if err == nil {
 			return nil
 		}
@@ -65,11 +64,12 @@ func SaveWorkerTask(task WorkerTask) error {
 	return fmt.Errorf("task save failed: max retries exceeded")
 }
 
-func SetTaskStatusSent(task WorkerTask) error {
-	collection := db.Collection("workertasks")
+func SetTaskStatusSent(collection *mongo.Collection, task *WorkerTask) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
 
 	for i := 0; i < maxRetries; i++ {
-		_, err := collection.UpdateOne(context.TODO(),
+		_, err := collection.UpdateOne(ctx,
 			bson.M{"_id": task.RequestId},
 			bson.M{"$set": bson.M{"status": "sent"}},
 		)
@@ -80,23 +80,4 @@ func SetTaskStatusSent(task WorkerTask) error {
 	}
 
 	return fmt.Errorf("update task status failed: max retries exceeded")
-}
-
-func RetryPendingTask() {
-	for {
-		time.Sleep(10 * time.Second)
-
-		cursor, err := db.Collection("workertasks").Find(context.TODO(), bson.M{"status": "pending"})
-		if err != nil {
-			log.Printf("Error finding pending tasks: %v", err)
-			continue
-		}
-
-		for cursor.Next(context.TODO()) {
-			var task WorkerTask
-			if err = cursor.Decode(&task); err == nil {
-				broker.PublishTask(task)
-			}
-		}
-	}
 }

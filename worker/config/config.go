@@ -9,7 +9,7 @@ import (
 var Cfg *Config
 
 type Config struct {
-	ManagerUrl        string `json:"managerUrl"`
+	TaskQueueName     string `json:"taskQueueName"`
 	ResponseQueueName string `json:"responseQueueName"`
 }
 

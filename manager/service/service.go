@@ -1,10 +1,12 @@
 package service
 
 import (
+	"context"
+	"fmt"
 	"github.com/google/uuid"
-	"github.com/selfoma/crackhash/manager/broker"
 	"github.com/selfoma/crackhash/manager/config"
 	"github.com/selfoma/crackhash/manager/database"
+	"go.mongodb.org/mongo-driver/bson"
 	"log"
 	"time"
 )
@@ -14,26 +16,40 @@ const (
 	timeOut  = 3 * time.Minute
 )
 
-var CrackService = newCrackService()
-
-type crackService struct {
-	taskStorage *TaskStorage
+type Broker interface {
+	Consume()
+	Publish(t *database.WorkerTask)
 }
 
-func newCrackService() *crackService {
-	return &crackService{
-		taskStorage: NewTaskStorage(),
+var CrackService *crackService
+
+type crackService struct {
+	b           Broker
+	taskStorage *taskStorage
+}
+
+func InitService(b Broker) error {
+	storage, err := newTaskStorage()
+	if err != nil {
+		return fmt.Errorf("create tasks storage: %v", err)
 	}
+
+	CrackService = &crackService{b: b, taskStorage: storage}
+
+	return nil
 }
 
 func (cs *crackService) StartCrackHash(hash string, maxLength int) (string, error) {
 	requestId := uuid.New().String()
 
-	cs.taskStorage.CreateTask(requestId, 1)
+	err := cs.taskStorage.CreateTask(requestId, 1)
+	if err != nil {
+		return "", fmt.Errorf("create tasks: %v", err)
+	}
 
 	words := countWordsInAlphabet(alphabet, maxLength)
 	for i := 0; i < config.Cfg.WorkerCount; i++ {
-		task := database.WorkerTask{
+		task := &database.WorkerTask{
 			RequestId:   requestId,
 			Hash:        hash,
 			MaxLength:   maxLength,
@@ -43,12 +59,12 @@ func (cs *crackService) StartCrackHash(hash string, maxLength int) (string, erro
 			Status:      "pending",
 		}
 
-		err := database.SaveWorkerTask(task)
+		err = database.SaveWorkerTask(cs.taskStorage.tasks, task)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		broker.PublishTask(task)
+		cs.b.Publish(task)
 	}
 
 	go cs.monitorTaskTimeOut(requestId)
@@ -64,15 +80,20 @@ func (cs *crackService) monitorTaskTimeOut(requestId string) {
 
 	s, err := cs.taskStorage.GetTaskStatusById(requestId)
 	if err != nil {
-		log.Printf("get task status failed: %v", err)
+		log.Printf("get tasks status failed: %v", err)
+		return
 	}
 
 	if s != StatusReady {
 		err = cs.taskStorage.UpdateTaskStatus(requestId, StatusError)
 		if err != nil {
-			log.Printf("update task status failed: %v", err)
+			log.Printf("update tasks status failed: %v", err)
 		}
 	}
+}
+
+func (cs *crackService) SetTaskStatusSent(task *database.WorkerTask) error {
+	return database.SetTaskStatusSent(cs.taskStorage.tasks, task)
 }
 
 func (cs *crackService) ProcessWorkerResponse(requestId string, words []string) error {
@@ -113,4 +134,23 @@ func countPartSize(part, n, r int) int {
 		return base + 1
 	}
 	return base
+}
+
+func (cs *crackService) RetryPendingTask() {
+	for {
+		time.Sleep(10 * time.Second)
+
+		cursor, err := cs.taskStorage.tasks.Find(context.TODO(), bson.M{"status": "pending"})
+		if err != nil {
+			log.Printf("Error finding pending tasks: %v", err)
+			continue
+		}
+
+		var task *database.WorkerTask
+		for cursor.Next(context.TODO()) {
+			if err = cursor.Decode(task); err == nil {
+				cs.b.Publish(task)
+			}
+		}
+	}
 }

@@ -2,6 +2,7 @@ package broker
 
 import (
 	"encoding/xml"
+	"github.com/selfoma/crackhash/manager/config"
 	"github.com/selfoma/crackhash/manager/service"
 	"log"
 )
@@ -12,12 +13,12 @@ type WorkerResponse struct {
 	PartNumber int      `xml:"partNumber"`
 }
 
-func ConsumeResponse() {
+func consumeResponse() {
 	defer rabbitConn.Close()
 	defer rabbitChannel.Close()
 
 	msgs, err := rabbitChannel.Consume(
-		"worker_tasks",
+		config.Cfg.ResponseQueueName,
 		"",
 		false,
 		false,

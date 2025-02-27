@@ -6,23 +6,26 @@ import (
 	"github.com/selfoma/crackhash/worker/config"
 	"github.com/selfoma/crackhash/worker/service"
 	"log"
+	"time"
 )
 
-func PublishResponse(resp service.WorkerResponse) {
-	queueName := config.Cfg.ResponseQueueName
+const (
+	maxRetries = 5
+)
 
-	_, err := rabbitChannel.QueueDeclare(queueName, true, false, false, false, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+func publishResponse(resp *service.WorkerResponse) {
 	body, _ := xml.Marshal(resp)
-	err = rabbitChannel.Publish("", queueName, false, false, amqp091.Publishing{
-		ContentType:  "text/xml",
-		DeliveryMode: amqp091.Persistent,
-		Body:         body,
-	})
-	if err != nil {
-		log.Fatal(err)
+	for i := 0; i < maxRetries; i++ {
+		err := rabbitChannel.Publish("", config.Cfg.ResponseQueueName, false, false, amqp091.Publishing{
+			ContentType:  "text/xml",
+			DeliveryMode: amqp091.Persistent,
+			Body:         body,
+		})
+		if err == nil {
+			return
+		}
+		log.Printf("publish failed: %v", err)
+		time.Sleep(time.Duration(i+1) * time.Second)
 	}
+	log.Fatal("failed to publish response")
 }

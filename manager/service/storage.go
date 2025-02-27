@@ -1,9 +1,15 @@
 package service
 
 import (
+	"context"
 	"fmt"
+	"github.com/selfoma/crackhash/manager/database"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 	"log"
 	"sync"
+	"time"
 )
 
 const (
@@ -13,89 +19,113 @@ const (
 )
 
 type TaskResult struct {
-	Words    []string `json:"words"`
-	Parts    int      `json:"parts"`
-	Received int      `json:"received"`
-	Status   string   `json:"status"`
+	TaskId   string   `bson:"_id"      json:"taskId"`
+	Words    []string `bson:"words"    json:"words"`
+	Parts    int      `bson:"parts"    json:"parts"`
+	Received int      `bson:"received" json:"received"`
+	Status   string   `bson:"status"   json:"status"`
 }
 
-type TaskStorage struct {
+type taskStorage struct {
 	mu    sync.RWMutex
-	tasks map[string]*TaskResult
+	tasks *mongo.Collection
 }
 
-func NewTaskStorage() *TaskStorage {
-	return &TaskStorage{
-		tasks: make(map[string]*TaskResult),
+func newTaskStorage() (*taskStorage, error) {
+	tasks, err := database.ConnectMongo()
+	if err != nil {
+		return nil, fmt.Errorf("connect mongo: %v", err)
 	}
+	return &taskStorage{
+		tasks: tasks,
+	}, nil
 }
 
-func (s *TaskStorage) CreateTask(requestId string, parts int) *TaskResult {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *taskStorage) CreateTask(requestId string, parts int) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
 
 	task := &TaskResult{
+		TaskId:   requestId,
 		Words:    nil,
 		Parts:    parts,
 		Received: 0,
 		Status:   StatusInProgress,
 	}
 
-	s.tasks[requestId] = task
-	return task
-}
-
-func (s *TaskStorage) UpdateTask(requestId string, workerFoundWords []string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	task, ok := s.tasks[requestId]
-	if !ok {
-		return fmt.Errorf("task %s not found", requestId)
+	_, err := s.tasks.InsertOne(ctx, task)
+	if err != nil {
+		return fmt.Errorf("create tasks: %v", err)
 	}
 
-	task.Words = append(task.Words, workerFoundWords...)
-	task.Received++
+	return nil
+}
+
+func (s *taskStorage) UpdateTask(requestId string, workerFoundWords []string) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	defer cancel()
+
+	id := bson.M{"_id": requestId}
+	upd := bson.M{
+		"$push": bson.M{"words": bson.M{"$each": workerFoundWords}},
+		"$inc":  bson.M{"parts": 1},
+	}
+
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var task TaskResult
+	err := s.tasks.FindOneAndUpdate(ctx, id, upd, opts).Decode(&task)
+	if err != nil {
+		return fmt.Errorf("find mongo: %v", err)
+	}
 
 	if task.Received == task.Parts {
-		task.Status = StatusReady
+		_, err = s.tasks.UpdateOne(ctx, id, bson.M{"$set": bson.M{"status": StatusReady}})
+		if err != nil {
+			return fmt.Errorf("update status: %v", err)
+		}
 		log.Printf("TaskResult [%s] completed, found words: %v", requestId, workerFoundWords)
 	}
 
 	return nil
 }
 
-func (s *TaskStorage) GetTaskStatusById(requestId string) (string, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s *taskStorage) GetTaskStatusById(requestId string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
 
-	if task, ok := s.tasks[requestId]; ok {
-		return task.Status, nil
+	opts := options.FindOne().SetProjection(bson.M{"_id": 0, "words": 0, "parts": 0, "received": 0})
+
+	var status string
+	err := s.tasks.FindOne(ctx, bson.M{"_id": requestId}, opts).Decode(&status)
+	if err != nil {
+		return "", fmt.Errorf("get status: %v", err)
 	}
-	return "", fmt.Errorf("task %s not found", requestId)
+
+	return status, nil
 }
 
-func (s *TaskStorage) UpdateTaskStatus(requestId, status string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+func (s *taskStorage) UpdateTaskStatus(requestId, status string) error {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
 
-	task, ok := s.tasks[requestId]
-	if !ok {
-		return fmt.Errorf("task %s not found", requestId)
+	_, err := s.tasks.UpdateOne(ctx, bson.M{"_id": requestId}, bson.M{"$set": bson.M{"status": status}})
+	if err != nil {
+		return fmt.Errorf("update status: %v", err)
 	}
-
-	task.Status = status
 
 	return nil
 }
 
-func (s *TaskStorage) GetTask(requestId string) (*TaskResult, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s *taskStorage) GetTask(requestId string) (*TaskResult, error) {
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	defer cancel()
 
-	task, ok := s.tasks[requestId]
-	if !ok {
-		return nil, fmt.Errorf("task %s not found", requestId)
+	var task *TaskResult
+	err := s.tasks.FindOne(ctx, bson.M{"_id": requestId}).Decode(task)
+	if err != nil {
+		return nil, fmt.Errorf("get tasks: %v", err)
 	}
+
 	return task, nil
 }

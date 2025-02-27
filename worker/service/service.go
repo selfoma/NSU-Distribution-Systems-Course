@@ -3,12 +3,16 @@ package service
 import (
 	"crypto/md5"
 	"encoding/hex"
-	"github.com/selfoma/crackhash/worker/broker"
 )
 
 const (
 	alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
 )
+
+type Broker interface {
+	Consume()
+	Publish(r *WorkerResponse)
+}
 
 type WorkerResponse struct {
 	RequestId  string   `xml:"requestId"`
@@ -16,7 +20,26 @@ type WorkerResponse struct {
 	PartNumber int      `xml:"partNumber"`
 }
 
-func BruteForce(task broker.WorkerTask) {
+type WorkerTask struct {
+	RequestId   string `json:"requestId"`
+	Hash        string `json:"hash"`
+	MaxLength   int    `json:"maxLength"`
+	WorkerCount int    `json:"workerCount"`
+	PartNumber  int    `json:"partNumber"`
+	PartCount   int    `json:"partCount"`
+}
+
+var WorkerService *workerService
+
+type workerService struct {
+	b Broker
+}
+
+func InitService(b Broker) {
+	WorkerService = &workerService{b: b}
+}
+
+func (ws *workerService) BruteForce(task *WorkerTask) {
 	var found []string
 
 	targetHash, length := task.Hash, task.MaxLength
@@ -34,13 +57,13 @@ func BruteForce(task broker.WorkerTask) {
 		}
 	}
 
-	resp := WorkerResponse{
+	resp := &WorkerResponse{
 		RequestId:  task.RequestId,
 		Words:      found,
 		PartNumber: task.PartNumber,
 	}
 
-	broker.PublishResponse(resp)
+	ws.b.Publish(resp)
 }
 
 func findWordsRangeBounds(size, part, n, r int) (int, int) {

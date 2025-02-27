@@ -5,19 +5,13 @@ import (
 	"github.com/rabbitmq/amqp091-go"
 	"github.com/selfoma/crackhash/manager/config"
 	"github.com/selfoma/crackhash/manager/database"
+	"github.com/selfoma/crackhash/manager/service"
 	"log"
 )
 
-func PublishTask(task database.WorkerTask) {
-	queueName := config.Cfg.TaskQueueName
-
-	_, err := rabbitChannel.QueueDeclare(queueName, true, false, false, false, nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+func publishTask(task *database.WorkerTask) {
 	body, _ := json.Marshal(task)
-	err = rabbitChannel.Publish("", queueName, false, false, amqp091.Publishing{
+	err := rabbitChannel.Publish("", config.Cfg.TaskQueueName, false, false, amqp091.Publishing{
 		ContentType:  "application/json",
 		DeliveryMode: amqp091.Persistent,
 		Body:         body,
@@ -26,5 +20,8 @@ func PublishTask(task database.WorkerTask) {
 		return
 	}
 
-	database.SetTaskStatusSent(task)
+	err = service.CrackService.SetTaskStatusSent(task)
+	if err != nil {
+		log.Fatal(err)
+	}
 }
