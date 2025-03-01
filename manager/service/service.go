@@ -42,7 +42,7 @@ func InitService(b Broker) error {
 func (cs *crackService) StartCrackHash(hash string, maxLength int) (string, error) {
 	requestId := uuid.New().String()
 
-	err := cs.taskStorage.CreateTask(requestId, 1)
+	err := cs.taskStorage.CreateTask(requestId, config.Cfg.WorkerCount)
 	if err != nil {
 		return "", fmt.Errorf("create tasks: %v", err)
 	}
@@ -50,6 +50,7 @@ func (cs *crackService) StartCrackHash(hash string, maxLength int) (string, erro
 	words := countWordsInAlphabet(alphabet, maxLength)
 	for i := 0; i < config.Cfg.WorkerCount; i++ {
 		task := &database.WorkerTask{
+			ID:          uuid.New().String(),
 			RequestId:   requestId,
 			Hash:        hash,
 			MaxLength:   maxLength,
@@ -146,8 +147,8 @@ func (cs *crackService) RetryPendingTask() {
 			continue
 		}
 
-		var task *database.WorkerTask
 		for cursor.Next(context.TODO()) {
+			var task *database.WorkerTask
 			if err = cursor.Decode(task); err == nil {
 				cs.b.Publish(task)
 			}

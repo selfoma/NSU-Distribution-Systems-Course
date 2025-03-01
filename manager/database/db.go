@@ -3,11 +3,13 @@ package database
 import (
 	"context"
 	"fmt"
+	"github.com/selfoma/crackhash/manager/config"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/writeconcern"
+	"log"
 	"time"
 )
 
@@ -18,7 +20,8 @@ const (
 var db *mongo.Database
 
 type WorkerTask struct {
-	RequestId   string `bson:"_id,omitempty" json:"requestId"`
+	ID          string `bson:"_id,omitempty" json:"id"`
+	RequestId   string `bson:"requestId"     json:"requestId"`
 	Hash        string `bson:"hash"          json:"hash"`
 	MaxLength   int    `bson:"maxLength"     json:"maxLength"`
 	WorkerCount int    `bson:"workerCount"   json:"workerCount"`
@@ -29,7 +32,7 @@ type WorkerTask struct {
 
 func ConnectMongo() (*mongo.Collection, error) {
 	clientOptions := options.Client().
-		ApplyURI("mongodb://mongo-primary:21017,mongo-secondary-1:21017,mongo-secondary-2:21017/?replicaSet=rs0").
+		ApplyURI(config.Cfg.MongoUrl).
 		SetWriteConcern(writeconcern.Majority()).
 		SetReadConcern(readconcern.Majority())
 	client, err := mongo.Connect(context.TODO(), clientOptions)
@@ -50,27 +53,31 @@ func ConnectMongo() (*mongo.Collection, error) {
 }
 
 func SaveWorkerTask(collection *mongo.Collection, task *WorkerTask) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 15*time.Second)
 	defer cancel()
 
+	log.Printf("Saved worker task: %v", task)
+
+	var err error
 	for i := 0; i < maxRetries; i++ {
-		_, err := collection.InsertOne(ctx, task)
+		_, err = collection.InsertOne(ctx, task)
 		if err == nil {
 			return nil
 		}
 		time.Sleep(time.Duration(i+1) * time.Second)
 	}
 
-	return fmt.Errorf("task save failed: max retries exceeded")
+	return fmt.Errorf("task save failed: max retries exceeded: %v", err)
 }
 
 func SetTaskStatusSent(collection *mongo.Collection, task *WorkerTask) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 15*time.Second)
 	defer cancel()
 
+	var err error
 	for i := 0; i < maxRetries; i++ {
-		_, err := collection.UpdateOne(ctx,
-			bson.M{"_id": task.RequestId},
+		_, err = collection.UpdateOne(ctx,
+			bson.M{"requestId": task.RequestId},
 			bson.M{"$set": bson.M{"status": "sent"}},
 		)
 		if err == nil {
@@ -79,5 +86,5 @@ func SetTaskStatusSent(collection *mongo.Collection, task *WorkerTask) error {
 		time.Sleep(time.Duration(i+1) * time.Second)
 	}
 
-	return fmt.Errorf("update task status failed: max retries exceeded")
+	return fmt.Errorf("update task status failed: max retries exceeded: %v", err)
 }

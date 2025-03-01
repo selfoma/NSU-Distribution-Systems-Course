@@ -29,11 +29,11 @@ func consumeResponse() {
 		log.Fatalf("Failed to register consumer: %v", err)
 	}
 
-	var resp WorkerResponse
 	for msg := range msgs {
-		err = xml.Unmarshal(msg.Body, &resp)
+		resp := &WorkerResponse{}
+		err = xml.Unmarshal(msg.Body, resp)
 		if err != nil {
-			log.Fatalf("Failed to unmarshal message: %v", err)
+			log.Fatalf("Failed to unmarshal message: [M] %v | [E] %v", msg.Body, err)
 		}
 
 		err = service.CrackService.ProcessWorkerResponse(resp.RequestId, resp.Words)

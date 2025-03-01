@@ -39,6 +39,7 @@ func handleCrackRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		log.Printf("Failed to encode response: %v", err)
 		return
 	}
@@ -63,7 +64,9 @@ func handleStatusRequest(w http.ResponseWriter, r *http.Request) {
 
 	task, err := service.CrackService.GetTask(requestId)
 	if err != nil {
+		log.Printf("Failed to get task: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	var data []string
@@ -78,6 +81,7 @@ func handleStatusRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {
-		log.Printf("Failed to encode response: %v", err)
+		log.Printf("Failed to encode response: [R] %v | [E] %v", resp, err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }

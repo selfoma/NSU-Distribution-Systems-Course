@@ -33,6 +33,11 @@ func ConnectRabbitMq() error {
 		log.Fatal(err)
 	}
 
+	_, err = rabbitChannel.QueueDeclare(config.Cfg.ResponseQueueName, true, false, false, false, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	fmt.Println("RABBITMQ: SUCCEEDED")
 
 	return nil

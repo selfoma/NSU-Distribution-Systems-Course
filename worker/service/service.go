@@ -21,12 +21,14 @@ type WorkerResponse struct {
 }
 
 type WorkerTask struct {
-	RequestId   string `json:"requestId"`
-	Hash        string `json:"hash"`
-	MaxLength   int    `json:"maxLength"`
-	WorkerCount int    `json:"workerCount"`
-	PartNumber  int    `json:"partNumber"`
-	PartCount   int    `json:"partCount"`
+	ID          string `bson:"_id,omitempty" json:"id"`
+	RequestId   string `bson:"requestId"     json:"requestId"`
+	Hash        string `bson:"hash"          json:"hash"`
+	MaxLength   int    `bson:"maxLength"     json:"maxLength"`
+	WorkerCount int    `bson:"workerCount"   json:"workerCount"`
+	PartNumber  int    `bson:"partNumber"    json:"partNumber"`
+	PartCount   int    `bson:"partCount"     json:"partCount"`
+	Status      string `bson:"status"        json:"status"`
 }
 
 var WorkerService *workerService

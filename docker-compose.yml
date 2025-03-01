@@ -8,64 +8,106 @@ services:
             - "8080:8080"
         networks:
             - crackhash-net
-        volumes:
-            - ./manager/config.json:/root/config.json
         depends_on:
-            - worker0
+            rabbitmq:
+                condition: service_healthy
+        volumes:
+            - ./manager/config/config.json:/root/config/config.json
     worker0:
         build: ./worker
         restart: always
         networks:
             - crackhash-net
         volumes:
-            - ./worker/config.json:/root/config.json
+            - ./worker/config/config.json:/root/config/config.json
+        depends_on:
+            manager:
+                condition: service_started
     worker1:
         build: ./worker
         restart: always
         networks:
             - crackhash-net
         volumes:
-            - ./worker/config.json:/root/config.json
+            - ./worker/config/config.json:/root/config/config.json
+        depends_on:
+            manager:
+                condition: service_started
+    mongo-primary:
+        container_name: mongo-primary
+        image: mongo:latest
+        restart: always
+        command: [ "mongod", "--replSet", "rs0", "--bind_ip_all", "--quiet", "--logpath", "/dev/null"]
+        ports:
+            - "21017:27017"
+        networks:
+            - crackhash-net
+        healthcheck:
+            test: [ "CMD", "mongosh", "--eval", "rs.status().ok" ]
+            interval: 10s
+            timeout: 20s
+            retries: 5
+        logging:
+            driver: "none"
+    mongo-secondary-1:
+        container_name: mongo-secondary-1
+        image: mongo:latest
+        restart: always
+        command: [ "mongod", "--replSet", "rs0", "--bind_ip_all", "--quiet", "--logpath", "/dev/null"]
+        ports:
+            - "21018:27018"
+        networks:
+            - crackhash-net
+        healthcheck:
+            test: [ "CMD", "mongosh", "--eval", "rs.status().ok" ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+    mongo-secondary-2:
+        container_name: mongo-secondary-2
+        image: mongo:latest
+        restart: always
+        command: [ "mongod", "--replSet", "rs0", "--bind_ip_all", "--quiet", "--logpath", "/dev/null"]
+        ports:
+            - "21019:27019"
+        networks:
+            - crackhash-net
+        healthcheck:
+            test: [ "CMD", "mongosh", "--eval", "rs.status().ok" ]
+            interval: 10s
+            timeout: 5s
+            retries: 5
     mongo-init:
         image: mongo:latest
-        depends_on:
-            - mongo-primary
-        entrypoint: ["mongosh", "--host", "mongo-primary", "--file", "./scripts/init-replica.js"]
+        restart: "no"
+        entrypoint: [ "/bin/sh", "-c", "sleep 5 && mongosh --host mongo-primary /scripts/init-replica.js" ]
         volumes:
             - ./scripts:/scripts
         networks:
             - crackhash-net
-    mongo-primary:
-        image: mongo:latest
-        restart: always
-        command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-        ports:
-            - "21017:21017"
-        networks:
-            - crackhash-net
-    mongo-secondary-1:
-        image: mongo:latest
-        restart: always
-        command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
-        networks:
-            - crackhash-net
-    mongo-secondary-2:
-        image: mongo:latest
-        restart: always
-        command: [ "mongod", "--replSet", "rs0", "--bind_ip_all" ]
-        networks:
-            - crackhash-net
+        depends_on:
+            mongo-primary:
+                condition: service_started
+            mongo-secondary-1:
+                condition: service_started
+            mongo-secondary-2:
+                condition: service_started
     rabbitmq:
         image: rabbitmq:3-management
         restart: always
         environment:
             RABBITMQ_DEFAULT_USER: user
-            RABBITMQ_DEFAULT_PASSWORD: password
+            RABBITMQ_DEFAULT_PASS: password
         ports:
             - "5672:5672"
             - "15672:15672"
         networks:
             - crackhash-net
+        healthcheck:
+            test: [ "CMD", "rabbitmq-diagnostics", "check_running" ]
+            interval: 10s
+            timeout: 10s
+            retries: 5
 
 networks:
     crackhash-net:

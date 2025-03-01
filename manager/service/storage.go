@@ -42,12 +42,12 @@ func newTaskStorage() (*taskStorage, error) {
 }
 
 func (s *taskStorage) CreateTask(requestId string, parts int) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 15*time.Second)
 	defer cancel()
 
 	task := &TaskResult{
 		TaskId:   requestId,
-		Words:    nil,
+		Words:    []string{},
 		Parts:    parts,
 		Received: 0,
 		Status:   StatusInProgress,
@@ -62,19 +62,23 @@ func (s *taskStorage) CreateTask(requestId string, parts int) error {
 }
 
 func (s *taskStorage) UpdateTask(requestId string, workerFoundWords []string) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 15*time.Second)
 	defer cancel()
+
+	if workerFoundWords == nil {
+		workerFoundWords = []string{}
+	}
 
 	id := bson.M{"_id": requestId}
 	upd := bson.M{
 		"$push": bson.M{"words": bson.M{"$each": workerFoundWords}},
-		"$inc":  bson.M{"parts": 1},
+		"$inc":  bson.M{"received": 1},
 	}
 
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 
-	var task TaskResult
-	err := s.tasks.FindOneAndUpdate(ctx, id, upd, opts).Decode(&task)
+	task := &TaskResult{}
+	err := s.tasks.FindOneAndUpdate(ctx, id, upd, opts).Decode(task)
 	if err != nil {
 		return fmt.Errorf("find mongo: %v", err)
 	}
@@ -91,40 +95,42 @@ func (s *taskStorage) UpdateTask(requestId string, workerFoundWords []string) er
 }
 
 func (s *taskStorage) GetTaskStatusById(requestId string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 15*time.Second)
 	defer cancel()
 
 	opts := options.FindOne().SetProjection(bson.M{"_id": 0, "words": 0, "parts": 0, "received": 0})
 
-	var status string
+	status := struct {
+		Status string `bson:"status"`
+	}{}
 	err := s.tasks.FindOne(ctx, bson.M{"_id": requestId}, opts).Decode(&status)
 	if err != nil {
-		return "", fmt.Errorf("get status: %v", err)
+		return "", fmt.Errorf("get status: [ID] %v | [E] %v", requestId, err)
 	}
 
-	return status, nil
+	return status.Status, nil
 }
 
 func (s *taskStorage) UpdateTaskStatus(requestId, status string) error {
-	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 15*time.Second)
 	defer cancel()
 
 	_, err := s.tasks.UpdateOne(ctx, bson.M{"_id": requestId}, bson.M{"$set": bson.M{"status": status}})
 	if err != nil {
-		return fmt.Errorf("update status: %v", err)
+		return fmt.Errorf("update status: [ID] %v | [E] %v", requestId, err)
 	}
 
 	return nil
 }
 
 func (s *taskStorage) GetTask(requestId string) (*TaskResult, error) {
-	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.TODO(), 15*time.Second)
 	defer cancel()
 
-	var task *TaskResult
+	task := &TaskResult{}
 	err := s.tasks.FindOne(ctx, bson.M{"_id": requestId}).Decode(task)
 	if err != nil {
-		return nil, fmt.Errorf("get tasks: %v", err)
+		return nil, fmt.Errorf("get tasks: [ID] %v | [E] %v", requestId, err)
 	}
 
 	return task, nil

@@ -23,11 +23,11 @@ func consumeTask() {
 		log.Fatalf("Failed to register consumer: %v", err)
 	}
 
-	var task *service.WorkerTask
 	for msg := range msgs {
+		task := &service.WorkerTask{}
 		err = json.Unmarshal(msg.Body, task)
 		if err != nil {
-			log.Fatalf("Failed to unmarshal message: %v", err)
+			log.Fatalf("Failed to unmarshal message: [M] %v | [E] %v", msg.Body, err)
 		}
 
 		service.WorkerService.BruteForce(task)

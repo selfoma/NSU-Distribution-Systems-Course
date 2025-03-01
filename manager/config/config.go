@@ -9,10 +9,10 @@ import (
 var Cfg *Config
 
 type Config struct {
-	WorkerCount       int      `json:"workerCount"`
-	WorkerUrls        []string `json:"workerUrls"`
-	ResponseQueueName string   `json:"responseQueueName"`
-	TaskQueueName     string   `json:"taskQueueName"`
+	WorkerCount       int    `json:"workerCount"`
+	MongoUrl          string `json:"mongoUrl"`
+	ResponseQueueName string `json:"responseQueueName"`
+	TaskQueueName     string `json:"taskQueueName"`
 }
 
 func LoadConfig(filename string) error {

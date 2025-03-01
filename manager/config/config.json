@@ -1,9 +1,6 @@
 {
   "workerCount": 2,
-  "workerUrls": [
-    "http://worker0:8081/internal/api/worker/hash/crack/task",
-    "http://worker1:8081/internal/api/worker/hash/crack/task"
-  ],
+  "mongoUrl" : "mongodb://mongo-primary:27017,mongo-secondary-1:27018,mongo-secondary-2:27019/?replicaSet=rs0",
   "responseQueueName": "worker_responses",
   "taskQueueName":     "worker_tasks"
 }
