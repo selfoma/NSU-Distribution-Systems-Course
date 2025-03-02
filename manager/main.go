@@ -28,7 +28,7 @@ func main() {
 	}
 
 	go b.Consume()
-	go service.CrackService.RetryPendingTask()
+	go service.CrackService.SendPendingTasks()
 
 	http.HandleFunc("/api/hash/crack", handleCrackRequest)
 	http.HandleFunc("/api/hash/status", handleStatusRequest)

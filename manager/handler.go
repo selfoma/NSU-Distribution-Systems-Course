@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"github.com/selfoma/crackhash/manager/service"
+	"github.com/selfoma/crackhash/manager/storage"
 	"log"
 	"net/http"
 )
@@ -70,7 +71,7 @@ func handleStatusRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var data []string
-	if task.Status == service.StatusReady {
+	if task.Status == storage.StatusReady {
 		data = task.Words
 	}
 	resp := TaskStatusResponse{

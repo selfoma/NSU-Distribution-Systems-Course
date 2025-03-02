@@ -30,6 +30,8 @@ func consumeTask() {
 			log.Fatalf("Failed to unmarshal message: [M] %v | [E] %v", msg.Body, err)
 		}
 
+		log.Println(task)
+
 		service.WorkerService.BruteForce(task)
 
 		msg.Ack(false)

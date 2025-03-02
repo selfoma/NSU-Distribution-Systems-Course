@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/rabbitmq/amqp091-go"
 	"github.com/selfoma/crackhash/manager/config"
-	"github.com/selfoma/crackhash/manager/database"
+	"github.com/selfoma/crackhash/manager/storage"
 	"log"
 )
 
@@ -49,6 +49,6 @@ func (rq *RabbitMqBroker) Consume() {
 	consumeResponse()
 }
 
-func (rq *RabbitMqBroker) Publish(t *database.WorkerTask) {
+func (rq *RabbitMqBroker) Publish(t *storage.WorkerTask) {
 	publishTask(t)
 }

@@ -3,6 +3,7 @@ package service
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"log"
 )
 
 const (
@@ -66,6 +67,8 @@ func (ws *workerService) BruteForce(task *WorkerTask) {
 	}
 
 	ws.b.Publish(resp)
+
+	log.Println("DONE.")
 }
 
 func findWordsRangeBounds(size, part, n, r int) (int, int) {
