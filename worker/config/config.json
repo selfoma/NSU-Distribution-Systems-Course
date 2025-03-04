@@ -1,0 +1,4 @@
+{
+  "responseQueueName": "worker_responses",
+  "taskQueueName":     "worker_tasks"
+}

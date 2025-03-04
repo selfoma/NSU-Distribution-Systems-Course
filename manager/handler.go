@@ -2,13 +2,11 @@ package main
 
 import (
 	"encoding/json"
-	"encoding/xml"
+	"github.com/selfoma/crackhash/manager/service"
+	"github.com/selfoma/crackhash/manager/storage"
 	"log"
 	"net/http"
 )
-
-var crackService = NewCrackService()
-var clientRequestCache = make(map[ClientCrackRequest]string)
 
 type ClientCrackRequest struct {
 	Hash      string `json:"hash"`
@@ -32,51 +30,20 @@ func handleCrackRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resp := ClientCrackResponse{}
-	if id, e := clientRequestCache[req]; e {
-		resp.RequestId = id
-	} else {
-		requestId, err := crackService.StartCrackHash(req.Hash, req.MaxLength)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		clientRequestCache[req] = requestId
-		resp.RequestId = requestId
+	requestId, err := service.CrackService.StartCrackHash(req.Hash, req.MaxLength)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
+	resp.RequestId = requestId
 
 	w.Header().Set("Content-Type", "application/json")
-	err := json.NewEncoder(w).Encode(resp)
+	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		log.Printf("Failed to encode response: %v", err)
 		return
 	}
-}
-
-type WorkerResponse struct {
-	RequestId  string   `xml:"requestId"`
-	Words      []string `xml:"words"`
-	PartNumber int      `xml:"partNumber"`
-}
-
-func handleWorkerResponse(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPatch {
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		return
-	}
-
-	var resp WorkerResponse
-	if err := xml.NewDecoder(r.Body).Decode(&resp); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	e := crackService.ProcessWorkerResponse(resp.RequestId, resp.Words)
-	if e != nil {
-		http.Error(w, e.Error(), http.StatusNotFound)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
 }
 
 type TaskStatusResponse struct {
@@ -96,13 +63,15 @@ func handleStatusRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := crackService.GetTask(requestId)
+	task, err := service.CrackService.GetTask(requestId)
 	if err != nil {
+		log.Printf("Failed to get task: %v", err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	var data []string
-	if task.Status == StatusReady {
+	if task.Status == storage.StatusReady {
 		data = task.Words
 	}
 	resp := TaskStatusResponse{
@@ -113,6 +82,7 @@ func handleStatusRequest(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	err = json.NewEncoder(w).Encode(resp)
 	if err != nil {
-		log.Printf("Failed to encode response: %v", err)
+		log.Printf("Failed to encode response: [R] %v | [E] %v", resp, err)
+		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 	}
 }

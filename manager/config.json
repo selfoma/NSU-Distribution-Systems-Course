@@ -1,6 +1,0 @@
-{
-  "workerCount": 1,
-  "workerUrls": [
-    "http://worker0:8081/internal/api/worker/hash/crack/task"
-  ]
-}
