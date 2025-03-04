@@ -27,12 +27,12 @@ type crackService struct {
 }
 
 func InitService(b Broker) error {
-	storage, err := storage.NewTaskStorage()
+	s, err := storage.NewTaskStorage()
 	if err != nil {
 		return fmt.Errorf("create tasks storage: %v", err)
 	}
 
-	CrackService = &crackService{b: b, taskStorage: storage}
+	CrackService = &crackService{b: b, taskStorage: s}
 
 	return nil
 }
