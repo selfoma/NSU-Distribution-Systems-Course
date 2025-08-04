@@ -1,7 +1,3 @@
-Вот перевод твоего README на английский:
-
----
-
 # CrackHash
 
 ## Description
