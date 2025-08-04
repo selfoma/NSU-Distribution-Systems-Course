@@ -1,32 +1,43 @@
+Вот перевод твоего README на английский:
+
+---
+
 # CrackHash
 
-## Описание
-CrackHash — это распределённая система для взлома MD5-хэшей методом brute-force. Система состоит из менеджера и нескольких воркеров, взаимодействующих через HTTP и RabbitMQ.
+## Description
 
-### Основные компоненты:
-- **Менеджер** принимает запросы на расшифровку MD5-хэшей, распределяет задачи между воркерами, агрегирует результаты и возвращает их пользователю.
-- **Воркеры** выполняют перебор слов в заданном диапазоне и отправляют найденные совпадения менеджеру.
-- **RabbitMQ** используется для отказоустойчивого взаимодействия между сервисами.
-- **MongoDB (реплицируемая)** хранит данные о запросах для обеспечения сохранности.
+CrackHash is a distributed system for cracking MD5 hashes using brute-force. The system consists of a manager and multiple workers communicating via HTTP and RabbitMQ.
 
-## Технологии
-- **Язык**: Go
-- **Контейнеризация**: Docker, Docker Compose
-- **Очередь сообщений**: RabbitMQ
-- **База данных**: MongoDB с репликацией
+### Main components:
 
-## Отказоустойчивость
-- Данные запросов сохраняются в MongoDB.
-- Задачи передаются через RabbitMQ с механизмом подтверждения доставки.
-- В случае сбоя одного из компонентов система продолжает работу.
+* **Manager** receives hash cracking requests, distributes tasks among workers, aggregates results, and returns them to the user.
+* **Workers** perform brute-force within a given range and send any found matches back to the manager.
+* **RabbitMQ** ensures fault-tolerant communication between services.
+* **(Replicated) MongoDB** stores request data to guarantee persistence.
 
-## Запуск
+## Technologies
+
+* **Language**: Go
+* **Containerization**: Docker, Docker Compose
+* **Message Queue**: RabbitMQ
+* **Database**: Replicated MongoDB
+
+## Fault Tolerance
+
+* Request data is stored in MongoDB.
+* Tasks are sent through RabbitMQ with delivery acknowledgment.
+* If one of the components fails, the system continues to operate.
+
+## Run
+
 ```sh
 docker compose up --build
 ```
 
 ## API
-### Запрос на взлом хэша
+
+### Submit a hash cracking request
+
 ```http
 POST /api/hash/crack
 Content-Type: application/json
@@ -35,25 +46,32 @@ Content-Type: application/json
     "maxLength": 4
 }
 ```
-Ответ:
+
+Response:
+
 ```json
 {
     "requestId": "730a04e6-4de9-41f9-9d5b-53b88b17afac"
 }
 ```
 
-### Проверка статуса
+### Check status
+
 ```http
 GET /api/hash/status?requestId=730a04e6-4de9-41f9-9d5b-53b88b17afac
 ```
-Ответ (если ещё в обработке):
+
+Response (if still processing):
+
 ```json
 {
     "status": "IN_PROGRESS",
     "data": null
 }
 ```
-Ответ (если готово):
+
+Response (if finished):
+
 ```json
 {
     "status": "READY",
